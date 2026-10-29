@@ -73,7 +73,8 @@ export function start(partial: Partial<Config> = {}): void {
   p.state = freshState(Date.now(), p.cfg.durationSeconds)
   p.state.running = true
   armInputWatch()
-  log(`▶️ injected | every ${p.cfg.intervalSeconds}s | ${Math.round(p.cfg.durationSeconds / 60)} min`)
+  const span = p.cfg.durationSeconds > 0 ? `${Math.round(p.cfg.durationSeconds / 60)} min` : "unlimited"
+  log(`▶️ injected | every ${p.cfg.intervalSeconds}s | ${span}`)
   queue(400)
 }
 

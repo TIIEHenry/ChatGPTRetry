@@ -49,10 +49,11 @@ codexretry --restart
 codexretry --duration 8h --interval 10 --port 9333
 ```
 
-`--duration` 接受 `Ns`、`Nm`、`Nh`，省略单位时按分钟计。默认间隔 10 秒，默认时长 30 分钟。
+`--duration` 接受 `Ns`、`Nm`、`Nh`，省略单位时按分钟计，也可以写 `unlimited` 或 `0`。默认间隔 10 秒。默认不限时，一直重试到你停掉进程。只有传入 `--duration`，或配置里写了时长，才会到点停止。
 
 ## 行为
 
+- 默认没有运行时长。到了 `--duration` 或配置里的截止时间才停。
 - 只点标题正好是「重试 / Retry / 重試」的按钮。倒计时文案「N 秒后重试」先不点。
 - 不点「重置使用量 / Reset usage / Reset limit」。
 - 出现用量上限、又没有重试按钮时，暂停到解析出的重置时间。

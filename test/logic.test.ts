@@ -4,9 +4,11 @@ import {
   classifyLabel,
   configFromJson,
   defaultConfig,
+  durationDeadline,
   freshState,
   noteClickResult,
   noteSend,
+  parseDuration,
   parseLimitReset,
   pickRetry,
   step,
@@ -123,6 +125,40 @@ test("click cooldown when the error line is still there", () => {
     buttons: [retry(40)],
   }), state, cfg)
   assert.equal(again.action.type, "noop")
+})
+
+test("default run has no deadline", () => {
+  const cfg = defaultConfig("zh")
+  assert.equal(cfg.durationSeconds, 0)
+  const state = freshState(1_000_000, cfg.durationSeconds)
+  assert.equal(state.deadline, Infinity)
+  assert.equal(durationDeadline(1_000_000, 0), Infinity)
+  const later = step(obs({
+    now: 1_000_000 + 24 * 3600_000,
+    errorYs: [400],
+    buttons: [retry(410)],
+  }), state, cfg)
+  assert.equal(later.action.type, "click")
+})
+
+test("a finite duration still stops at the deadline", () => {
+  const cfg = defaultConfig("zh")
+  cfg.durationSeconds = 30 * 60
+  const state = freshState(0, cfg.durationSeconds)
+  const result = step(obs({
+    now: 30 * 60 * 1000,
+    errorYs: [40],
+    buttons: [retry(40)],
+  }), state, cfg)
+  assert.equal(result.action.type, "stop")
+})
+
+test("unlimited duration can be selected explicitly", () => {
+  assert.equal(configFromJson({ durationChoice: "unlimited" }, "zh").durationSeconds, 0)
+  assert.equal(configFromJson({ durationSeconds: 0, durationChoice: "30" }, "zh").durationSeconds, 0)
+  assert.equal(parseDuration("unlimited"), 0)
+  assert.equal(parseDuration("0"), 0)
+  assert.equal(parseDuration("8h"), 8 * 3600)
 })
 
 test("config json from the macOS app is accepted", () => {

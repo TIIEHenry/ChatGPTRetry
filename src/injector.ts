@@ -35,6 +35,7 @@ function parseArgs(argv: string[]): Args {
       console.log(`用法: codexretry [--restart] [--port 9333] [--duration 8h] [--interval 10]
 
 把重试脚本注入 ChatGPT 桌面版。脚本在页面内点击「重试」，不移动鼠标。
+默认不限时，一直运行到手动停止。--duration 接受 Ns、Nm、Nh，省略单位按分钟；0 或 unlimited 仍表示不限时。
 已经开着的 ChatGPT 没有调试端口，需要 --restart 才会退出并重新打开。`)
       process.exit(0)
     }
@@ -240,7 +241,8 @@ async function main(): Promise<void> {
   for (const info of listed.targetInfos || []) {
     if (isUiTarget(info.type)) await attach(info.targetId, info.url)
   }
-  say(`监控中。间隔 ${cfg.intervalSeconds}s，时长 ${Math.round(cfg.durationSeconds / 60)} 分钟。日志在 ${join(configDir(), "logs")}`)
+  const span = cfg.durationSeconds > 0 ? `时长 ${Math.round(cfg.durationSeconds / 60)} 分钟` : "不限时"
+  say(`监控中。间隔 ${cfg.intervalSeconds}s，${span}。日志在 ${join(configDir(), "logs")}`)
 
   const cfgPath = join(configDir(), "config.json")
   if (existsSync(cfgPath)) {

@@ -21,6 +21,7 @@ export type Lang = "zh" | "en"
 export interface Config {
   lang: Lang
   intervalSeconds: number
+  /** 大于 0 为运行秒数。0 表示不限时，直到手动停止。 */
   durationSeconds: number
   errorKeywords: string[]
   idleSendEnabled: boolean
@@ -98,7 +99,7 @@ export function defaultConfig(lang: Lang = "en"): Config {
   return {
     lang,
     intervalSeconds: 10,
-    durationSeconds: 30 * 60,
+    durationSeconds: 0,
     errorKeywords: [...DEFAULT_ERROR_KEYWORDS],
     idleSendEnabled: false,
     idleSendMinutes: 10,
@@ -110,6 +111,12 @@ export function defaultConfig(lang: Lang = "en"): Config {
     sound: true,
     noSleep: true,
   }
+}
+
+/** 0 或非有限正数表示没有截止时间。 */
+export function durationDeadline(now: number, durationSeconds: number): number {
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) return now + durationSeconds * 1000
+  return Number.POSITIVE_INFINITY
 }
 
 export function freshState(now: number, durationSeconds: number): State {
@@ -131,7 +138,7 @@ export function freshState(now: number, durationSeconds: number): State {
     residualHintAt: 0,
     userHintAt: 0,
     lastScrollAt: 0,
-    deadline: now + durationSeconds * 1000,
+    deadline: durationDeadline(now, durationSeconds),
     running: true,
   }
 }
@@ -214,7 +221,7 @@ export function step(obs: Observation, prev: State, cfg: Config): StepResult {
   const lang = cfg.lang
   const say = (en: string, zh: string) => logs.push(t(lang, en, zh))
 
-  if (!state.running || obs.now >= state.deadline) {
+  if (!state.running || (Number.isFinite(state.deadline) && obs.now >= state.deadline)) {
     state.running = false
     const reason = t(lang, "preset duration reached", "已到设定时长")
     say(`⏹ ${reason}`, `⏹ ${reason}`)
@@ -409,9 +416,12 @@ export function configFromJson(raw: unknown, lang: Lang): Config {
     cfg.durationSeconds = Number(choice) * 60
   } else if (choice === "custom") {
     cfg.durationSeconds = Math.max(1, custom) * 60
+  } else if (choice === "0" || choice === "unlimited" || choice === "forever" || choice === "inf" || choice === "none") {
+    cfg.durationSeconds = 0
   }
-  if (typeof o.durationSeconds === "number" && o.durationSeconds >= 60) {
-    cfg.durationSeconds = o.durationSeconds
+  if (typeof o.durationSeconds === "number" && Number.isFinite(o.durationSeconds)) {
+    if (o.durationSeconds === 0) cfg.durationSeconds = 0
+    else if (o.durationSeconds >= 60) cfg.durationSeconds = o.durationSeconds
   }
   if (Array.isArray(o.errorKeywords) && o.errorKeywords.every((k) => typeof k === "string") && o.errorKeywords.length) {
     cfg.errorKeywords = o.errorKeywords.map((k) => k.toLowerCase())
@@ -431,6 +441,10 @@ export function configFromJson(raw: unknown, lang: Lang): Config {
 }
 
 export function parseDuration(text: string): number | null {
+  const raw = text.trim().toLowerCase()
+  if (raw === "0" || raw === "inf" || raw === "infinity" || raw === "unlimited" || raw === "forever" || raw === "none") {
+    return 0
+  }
   const m = /^(\d+)\s*(s|m|h)?$/i.exec(text.trim())
   if (!m) return null
   const n = Number(m[1])
