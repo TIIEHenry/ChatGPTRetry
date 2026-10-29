@@ -1,0 +1,26 @@
+#!/bin/sh
+# 把重试脚本注入 ChatGPT 桌面版。点击发生在页面内部，不移动鼠标。
+# 无论是仓库里的 ./codexretry，还是安装后的符号链接，都从真实路径找资源。
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$(readlink -f "$0")")" && pwd)
+cd "$ROOT"
+
+need_build=0
+if [ ! -f page.bundle.js ]; then
+  need_build=1
+elif [ -f src/page.ts ] && { [ src/page.ts -nt page.bundle.js ] || [ src/logic.ts -nt page.bundle.js ]; }; then
+  need_build=1
+fi
+
+if [ "$need_build" -eq 1 ]; then
+  if [ ! -f src/page.ts ]; then
+    echo "codexretry: 缺少 page.bundle.js，安装不完整。" >&2
+    exit 1
+  fi
+  if [ ! -x node_modules/.bin/esbuild ]; then
+    npm install
+  fi
+  npm run build
+fi
+
+exec node --experimental-strip-types src/injector.ts "$@"

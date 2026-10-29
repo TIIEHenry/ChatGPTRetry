@@ -431,5 +431,5 @@ function log(line: string): void {
   const p = pilot()
   p.logs.push(line)
   if (p.logs.length > 200) p.logs.splice(0, p.logs.length - 200)
-  console.info(`[retrypilot] ${line}`)
+  console.info(`[codexretry] ${line}`)
 }

@@ -1,8 +1,11 @@
 {
-  "name": "codex-retrypilot-linux",
+  "name": "codexretry",
   "private": true,
   "description": "Inject a script into the Linux ChatGPT desktop app and click Retry in the page.",
   "type": "module",
+  "bin": {
+    "codexretry": "./codexretry"
+  },
   "engines": {
     "node": ">=20"
   },

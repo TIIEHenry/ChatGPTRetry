@@ -4,20 +4,41 @@ ChatGPT 桌面版在 Linux 上出现 “Selected model is at capacity” 时，�
 
 它和 macOS 应用 [Codex-RetryPilot](https://github.com/yuxi1989/Codex-RetryPilot) 使用同一套判定，但是独立项目。macOS 版走辅助功能；这一版只运行在 Linux 的 ChatGPT 桌面版里。
 
-## 运行
+## 安装
 
 需要 Node.js 20+，以及已安装的 ChatGPT 桌面版（`/usr/bin/chatgpt`）。
 
+装到当前用户，不需要 root。`~/.local/bin` 需要在 `PATH` 里：
+
 ```bash
-./retrypilot
+PREFIX="$HOME/.local" ./install.sh
 ```
 
-第一次会执行 `npm install`，只用来打包注入脚本。
+装到系统：
+
+```bash
+sudo ./install.sh
+```
+
+装好之后命令是 `codexretry`。卸掉时 `PREFIX` 要和安装时一样：
+
+```bash
+PREFIX="$HOME/.local" ./install.sh uninstall
+sudo ./install.sh uninstall
+```
+
+也可以在源码目录里直接跑 `./codexretry`。页面脚本比 `page.bundle.js` 新、又还没有打包工具时，它会执行一次 `npm install`。
+
+## 运行
+
+```bash
+codexretry
+```
 
 ChatGPT 已经在跑、又没有调试端口时，命令会退出并打印原因。确认可以关掉当前窗口后：
 
 ```bash
-./retrypilot --restart
+codexretry --restart
 ```
 
 这会退出当前 ChatGPT 进程，再用 `--remote-debugging-port` 重新打开，然后注入脚本。
@@ -25,7 +46,7 @@ ChatGPT 已经在跑、又没有调试端口时，命令会退出并打印原因
 可选参数：
 
 ```bash
-./retrypilot --duration 8h --interval 10 --port 9333
+codexretry --duration 8h --interval 10 --port 9333
 ```
 
 `--duration` 接受 `Ns`、`Nm`、`Nh`，省略单位时按分钟计。默认间隔 10 秒，默认时长 30 分钟。

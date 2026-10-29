@@ -30,7 +30,7 @@ test("injected script clicks Retry and does not click Reset usage", { timeout: 4
   if (!addr || typeof addr === "string") throw new Error("no port")
   const url = `http://127.0.0.1:${addr.port}/fixture.html`
   const port = 9337
-  const profile = mkdtempSync(join(tmpdir(), "retrypilot-chrome-"))
+  const profile = mkdtempSync(join(tmpdir(), "codexretry-chrome-"))
   const chrome = spawn("google-chrome", [
     "--headless=new",
     "--disable-gpu",
@@ -40,7 +40,7 @@ test("injected script clicks Retry and does not click Reset usage", { timeout: 4
     `--user-data-dir=${profile}`,
     url,
   ], { stdio: "ignore" })
-  const configDir = mkdtempSync(join(tmpdir(), "retrypilot-cfg-"))
+  const configDir = mkdtempSync(join(tmpdir(), "codexretry-cfg-"))
   const injector = spawn(process.execPath, [
     "--experimental-strip-types",
     join(root, "src/injector.ts"),

@@ -1,8 +1,0 @@
-#!/bin/sh
-# 把重试脚本注入 ChatGPT 桌面版。点击发生在页面内部，不移动鼠标。
-cd "$(dirname "$0")" || exit 1
-if [ ! -x node_modules/.bin/esbuild ]; then
-  npm install
-fi
-npm run build || exit 1
-exec node --experimental-strip-types src/injector.ts "$@"

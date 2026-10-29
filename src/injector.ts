@@ -32,7 +32,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--duration") out.duration = parseDuration(next() || "")
     else if (a === "--interval") out.interval = Number(next())
     else if (a === "--help" || a === "-h") {
-      console.log(`用法: node src/injector.ts [--restart] [--port 9333] [--duration 8h] [--interval 10]
+      console.log(`用法: codexretry [--restart] [--port 9333] [--duration 8h] [--interval 10]
 
 把重试脚本注入 ChatGPT 桌面版。脚本在页面内点击「重试」，不移动鼠标。
 已经开着的 ChatGPT 没有调试端口，需要 --restart 才会退出并重新打开。`)
@@ -162,7 +162,7 @@ async function ensureApp(args: Args): Promise<void> {
     throw new Error(
       `ChatGPT 已在运行（pid ${pids.join(", ")}），但没有调试端口 ${args.port}。\n` +
       `页面脚本只能注入到带调试端口启动的进程。退出 ChatGPT 后执行：\n` +
-      `  linux/retrypilot --restart`,
+      `  codexretry --restart`,
     )
   }
   if (args.noLaunch) throw new Error(`127.0.0.1:${args.port} 没有调试端口`)
@@ -231,7 +231,7 @@ async function main(): Promise<void> {
     if (msg.method === "Runtime.consoleAPICalled") {
       const argsList = (msg.params?.args as Array<{ value?: unknown }> | undefined) || []
       const text = argsList.map((a) => String(a.value ?? "")).join(" ")
-      if (text.includes("[retrypilot]")) say(text.replace("[retrypilot] ", ""))
+      if (text.includes("[codexretry]")) say(text.replace("[codexretry] ", ""))
     }
   })
 
@@ -265,7 +265,7 @@ function holdAwake(): void {
   import("node:child_process").then(({ spawn }) => {
     const child = spawn("systemd-inhibit", [
       "--what=idle:sleep",
-      "--who=Codex-RetryPilot",
+      "--who=codexretry",
       "--why=monitoring Codex",
       "--mode=block",
       "sleep", "infinity",
