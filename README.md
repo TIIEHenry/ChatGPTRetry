@@ -54,4 +54,4 @@ npm test
 
 ## 许可
 
-[MIT License](LICENSE)。Copyright (c) 2026 朱晓宇 (yuxi1989)。
+[MIT License](LICENSE)。
