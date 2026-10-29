@@ -1,4 +1,4 @@
-# codex-retrypilot-linux
+# ChatGPT-Retry
 
 ChatGPT 桌面版在 Linux 上出现 “Selected model is at capacity” 时，这个程序把一段脚本注入页面，在后台调用「重试」的 `click()`。不移动鼠标，也不把窗口拉到前台。
 
@@ -9,7 +9,6 @@ ChatGPT 桌面版在 Linux 上出现 “Selected model is at capacity” 时，�
 需要 Node.js 20+，以及已安装的 ChatGPT 桌面版（`/usr/bin/chatgpt`）。
 
 ```bash
-cd /path/to/codex-retrypilot-linux
 ./retrypilot
 ```
 
