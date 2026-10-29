@@ -59,18 +59,21 @@ test("injected script clicks Retry and does not click Reset usage", { timeout: 4
   injector.stderr?.on("data", (b) => { injectorLog += b })
   try {
     let clicked = 0
+    let hiddenClicked = 0
     let reset = 0
     const deadline = Date.now() + 30_000
     while (Date.now() < deadline) {
       const counts = await readCounts(port)
       if (counts) {
         clicked = counts.clicked
+        hiddenClicked = counts.hiddenClicked
         reset = counts.reset
-        if (clicked >= 1) break
+        if (clicked >= 1 && hiddenClicked >= 1) break
       }
       await new Promise((r) => setTimeout(r, 400))
     }
     assert.ok(clicked >= 1, `Retry was not clicked. injector: ${injectorLog}`)
+    assert.ok(hiddenClicked >= 1, `Hidden session retry was not clicked. injector: ${injectorLog}`)
     assert.equal(reset, 0)
   } finally {
     injector.kill("SIGTERM")
@@ -79,7 +82,7 @@ test("injected script clicks Retry and does not click Reset usage", { timeout: 4
   }
 })
 
-async function readCounts(port: number): Promise<{ clicked: number; reset: number } | null> {
+async function readCounts(port: number): Promise<{ clicked: number; hiddenClicked: number; reset: number } | null> {
   let list: Array<{ type: string; webSocketDebuggerUrl?: string; url: string }>
   try {
     const res = await fetch(`http://127.0.0.1:${port}/json/list`)
@@ -95,7 +98,7 @@ async function readCounts(port: number): Promise<{ clicked: number; reset: numbe
     ws.addEventListener("open", () => resolve())
     ws.addEventListener("error", () => reject(new Error("cdp")))
   })
-  const result = await new Promise<{ clicked?: number; reset?: number }>((resolve, reject) => {
+  const result = await new Promise<{ clicked?: number; hiddenClicked?: number; reset?: number }>((resolve, reject) => {
     ws.addEventListener("message", (ev) => {
       const msg = JSON.parse(String(ev.data))
       if (msg.id === 1) resolve(msg.result?.result?.value ?? {})
@@ -103,9 +106,9 @@ async function readCounts(port: number): Promise<{ clicked: number; reset: numbe
     ws.send(JSON.stringify({
       id: 1,
       method: "Runtime.evaluate",
-      params: { expression: "({clicked: window.__clicked || 0, reset: window.__reset || 0})", returnByValue: true },
+      params: { expression: "({clicked: window.__clicked || 0, hiddenClicked: window.__hiddenClicked || 0, reset: window.__reset || 0})", returnByValue: true },
     }))
     setTimeout(() => reject(new Error("timeout")), 2000)
   }).finally(() => ws.close())
-  return { clicked: result.clicked || 0, reset: result.reset || 0 }
+  return { clicked: result.clicked || 0, hiddenClicked: result.hiddenClicked || 0, reset: result.reset || 0 }
 }

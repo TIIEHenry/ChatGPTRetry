@@ -1,14 +1,45 @@
 <!doctype html>
 <html>
 <body>
-  <p id="err">Selected model is at capacity. Please try a different model.</p>
-  <button id="retry" type="button">Retry</button>
+  <main data-codex-history-swipe-page id="visible">
+    <p id="err">Selected model is at capacity. Please try a different model.</p>
+    <button id="retry" type="button">Retry</button>
+  </main>
+  <main data-codex-history-swipe-page id="hidden" style="width:0;height:0;overflow:hidden">
+    <p>Selected model is at capacity. Please try a different model.</p>
+    <button id="hiddenRetry" type="button" disabled aria-label="重试" style="display:flex;width:0;height:0">重试</button>
+  </main>
   <button id="reset" type="button">重置使用量</button>
   <script>
     window.__clicked = 0
+    window.__hiddenClicked = 0
     window.__reset = 0
     document.getElementById("retry").addEventListener("click", () => { window.__clicked++ })
     document.getElementById("reset").addEventListener("click", () => { window.__reset++ })
+    const hidden = document.getElementById("hiddenRetry")
+    hidden.addEventListener("click", () => { window.__hiddenClicked++ })
+    const inflight = {
+      memoizedState: true,
+      next: null,
+      queue: {
+        dispatch(value) {
+          inflight.memoizedState = value
+          hidden.disabled = Boolean(value)
+        },
+      },
+    }
+    hidden.__reactFiber$test = {
+      return: {
+        memoizedProps: { retryDelaySeconds: 0, conversationId: "bg" },
+        memoizedState: { memoizedState: {}, next: { memoizedState: 1, next: inflight } },
+        return: null,
+      },
+      memoizedProps: null,
+      memoizedState: null,
+    }
+    hidden.__reactProps$test = {
+      onClick() { window.__hiddenClicked++ },
+    }
   </script>
 </body>
 </html>

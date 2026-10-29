@@ -36,7 +36,7 @@ ChatGPT 已经在跑、又没有调试端口时，命令会退出并打印原因
 - 只点标题正好是「重试 / Retry / 重試」的按钮。倒计时文案「N 秒后重试」先不点。
 - 不点「重置使用量 / Reset usage / Reset limit」。
 - 出现用量上限、又没有重试按钮时，暂停到解析出的重置时间。
-- 窗口停在别的程序后面时仍然会点。切到另一条会话后，原来的按钮不在页面上，就点不到。
+- 窗口停在别的程序后面时仍然会点。左右滑动留下的相邻会话即使不在画面上，也会点它自己的「重试」，不切换当前会话。完全没挂在页面上的会话点不到。
 - 窗口最小化较长时间后，Chromium 会放慢页面定时器，检查间隔可能长于设定值。
 - 配置在 `~/.config/CodexRetry/config.json`，也可用 `RETRYPILOT_CONFIG_DIR` 或 `XDG_CONFIG_HOME` 改目录。字段与 macOS 版导出的 JSON 兼容，包括 `intervalSeconds`、`errorKeywords`、`scriptLines`、`limitPause`、`idleSendEnabled`。
 - 日志写到配置目录下的 `logs/`。日志只记脚本自己的状态，不记会话正文。

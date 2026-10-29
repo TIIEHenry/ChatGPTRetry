@@ -1,6 +1,8 @@
 /**
  * 注入到 Codex 页面里的脚本。
- * 找到「重试」后调用 HTMLElement.click()：这是可信点击，不移动鼠标，也不把窗口拉到前台。
+ * 找到「重试」后在页面内部触发点击：不移动鼠标，不把窗口拉到前台，也不切换当前会话。
+ * 左右滑动留下的相邻会话宽高为 0，按钮还可能处于「请求中」的禁用状态。
+ * 这种按钮直接调用它自己的 React onClick，点完焦点还给原来的输入框。
  */
 import {
   type Config,
@@ -16,9 +18,11 @@ import {
 } from "./logic.ts"
 
 const MARK = "__codexRetryPilot"
+const BUILD = "bg-retry-2"
 
 interface Pilot {
   running: boolean
+  build?: string
   state: State
   cfg: Config
   timer: number
@@ -61,7 +65,10 @@ export function stop(reason = "stopped"): void {
 export function start(partial: Partial<Config> = {}): void {
   const p = pilot()
   apply(partial)
-  if (p.running) return
+  if (p.running && p.build === BUILD) return
+  if (p.timer) window.clearTimeout(p.timer)
+  p.timer = 0
+  p.build = BUILD
   p.running = true
   p.state = freshState(Date.now(), p.cfg.durationSeconds)
   p.state.running = true
@@ -110,13 +117,15 @@ function runBody(): void {
     return
   }
   if (decided.action.type === "click") {
-    const clicked = pressRetry(decided.action.y)
+    const clicked = pressMountedRetries(p.cfg.errorKeywords)
+    if (clicked > 1) log(`🖱 本轮共点了 ${clicked} 个会话的重试`)
     window.setTimeout(() => {
       if (!pilot().running) return
       const after = collect(pilot().cfg.errorKeywords, pilot().lastInputAt)
-      const gone = !after.buttons.some((b) => b.kind === "retry") || after.errorYs.length === 0
-      pilot().state = noteClickResult(pilot().state, clicked && gone, after.errorYs.length > 0, Date.now())
-      if (clicked && gone) log(after.errorYs.length ? "⌛️ retry in flight" : "✅ error cleared")
+      const still = mountedRetryButtons(pilot().cfg.errorKeywords).length
+      const gone = clicked > 0 && (still === 0 || after.errorYs.length === 0)
+      pilot().state = noteClickResult(pilot().state, clicked > 0 && gone, after.errorYs.length > 0, Date.now())
+      if (clicked > 0 && gone) log(after.errorYs.length ? "⌛️ retry in flight" : "✅ error cleared")
       queue(decided.delayMs)
     }, 1200)
     return
@@ -132,8 +141,17 @@ function runBody(): void {
 
 function collect(keywords: string[], lastInputAt: number): Observation {
   const buttons = collectButtons()
+  const errorYs = collectHits(keywords).map((el) => midY(el))
+  // 左右滑动会把相邻会话留在 DOM 里，但宽高为 0，按钮也可能是禁用的。
+  // 这些「重试」都要计入，否则后台会话永远点不到。
+  for (const el of mountedRetryButtons(keywords)) {
+    if (shown(el) && !disabled(el)) continue
+    const y = shown(el) ? midY(el) : slotY(el)
+    buttons.push({ label: buttonLabel(el), y, kind: "retry" })
+    if (!shown(el)) errorYs.push(y)
+  }
   return {
-    errorYs: collectHits(keywords).map((el) => midY(el)),
+    errorYs,
     limitTexts: collectHits([
       "使用上限", "额度已用完", "usage limit", "codex and work usage", "rate limit resets",
     ]).map((el) => (el.textContent || "").trim()).filter(Boolean),
@@ -206,18 +224,123 @@ function disabled(el: HTMLElement): boolean {
   return el.hasAttribute("disabled") || el.getAttribute("aria-disabled") === "true"
 }
 
-function pressRetry(y: number): boolean {
-  let best: HTMLElement | null = null
-  let bestDy = Infinity
-  for (const el of queryDeep("button, [role='button']")) {
-    if (!(el instanceof HTMLElement) || !shown(el) || disabled(el)) continue
-    if (classifyLabel(buttonLabel(el)) !== "retry") continue
-    const dy = Math.abs(midY(el) - y)
-    if (dy < bestDy) { best = el; bestDy = dy }
+/** 每个已挂载的会话各点自己的「重试」，包括宽高为 0、以及卡在禁用状态的相邻会话。 */
+function pressMountedRetries(keywords: string[]): number {
+  const buttons = mountedRetryButtons(keywords)
+  let hidden = 0
+  for (const el of buttons) {
+    if (!shown(el)) hidden += 1
+    pressRetry(el)
   }
-  if (!best || bestDy > 120) return false
-  backgroundClick(best)
-  return true
+  if (hidden > 0) log(`🖱 后台会话 ${hidden} 个，不切换窗口`)
+  return buttons.length
+}
+
+function mountedRetryButtons(keywords: string[]): HTMLElement[] {
+  const roots = conversationRoots()
+  const out: HTMLElement[] = []
+  for (const root of roots) {
+    const text = rootText(root)
+    if (!textHits(text, keywords)) continue
+    for (const el of queryDeep("button, [role='button']", root)) {
+      if (!(el instanceof HTMLElement) || !painted(el)) continue
+      if (classifyLabel(buttonLabel(el)) !== "retry") continue
+      out.push(el)
+    }
+  }
+  return out
+}
+
+interface ReactHook {
+  memoizedState: unknown
+  next: ReactHook | null
+  queue: { dispatch?: (value: unknown) => void } | null
+}
+
+interface ReactFiber {
+  return: ReactFiber | null
+  memoizedProps: Record<string, unknown> | null
+  memoizedState: ReactHook | null
+}
+
+function reactKey(el: HTMLElement, prefix: string): string | undefined {
+  return Object.keys(el).find((key) => key.startsWith(prefix))
+}
+
+function reactFiber(el: HTMLElement): ReactFiber | null {
+  const key = reactKey(el, "__reactFiber$")
+  if (!key) return null
+  return (el as unknown as Record<string, ReactFiber | undefined>)[key] ?? null
+}
+
+/** 容量重试的禁用只表示「请求已发出」。请求悄悄返回后按钮会一直禁用，后台会话就再也不点了。 */
+function releaseInFlight(el: HTMLElement): boolean {
+  let fiber = reactFiber(el)
+  for (let i = 0; fiber && i < 40; i += 1, fiber = fiber.return) {
+    const props = fiber.memoizedProps
+    if (!props || !("retryDelaySeconds" in props)) continue
+    let hook: ReactHook | null = fiber.memoizedState
+    for (let h = 0; hook && h < 12; h += 1, hook = hook.next) {
+      if (hook.memoizedState !== true || typeof hook.queue?.dispatch !== "function") continue
+      hook.queue.dispatch(false)
+      return true
+    }
+    return false
+  }
+  return false
+}
+
+function callOnClick(el: HTMLElement): void {
+  const key = reactKey(el, "__reactProps$")
+  if (!key) return
+  const props = (el as unknown as Record<string, { onClick?: (event: Event) => void } | undefined>)[key]
+  if (typeof props?.onClick !== "function") return
+  props.onClick(new Event("click"))
+}
+
+function retryInRoot(root: Element | null): HTMLElement | null {
+  if (!root) return null
+  for (const el of queryDeep("button, [role='button']", root)) {
+    if (!(el instanceof HTMLElement) || !painted(el)) continue
+    if (classifyLabel(buttonLabel(el)) === "retry") return el
+  }
+  return null
+}
+
+function pressRetry(el: HTMLElement): void {
+  const root = el.closest("main[data-codex-history-swipe-page]")
+  const stuck = disabled(el)
+  if (stuck) releaseInFlight(el)
+  const fire = () => {
+    const target = el.isConnected ? el : retryInRoot(root)
+    if (!target || !target.isConnected) return
+    callOnClick(target)
+    if (!disabled(target)) backgroundClick(target)
+  }
+  if (stuck) window.setTimeout(fire, 120)
+  else fire()
+}
+
+function conversationRoots(): ParentNode[] {
+  const mains = [...document.querySelectorAll("main[data-codex-history-swipe-page]")]
+  return mains.length ? mains : [document]
+}
+
+function rootText(root: ParentNode): string {
+  if (root instanceof Document) return root.body?.textContent || ""
+  return (root as Element).textContent || ""
+}
+
+function slotY(el: HTMLElement): number {
+  const mains = [...document.querySelectorAll("main[data-codex-history-swipe-page]")]
+  const main = el.closest("main[data-codex-history-swipe-page]")
+  const idx = main ? mains.indexOf(main) : 0
+  return -100000 - Math.max(0, idx) * 500
+}
+
+function painted(el: HTMLElement): boolean {
+  const style = getComputedStyle(el)
+  return style.display !== "none" && style.visibility !== "hidden"
 }
 
 function pressKind(kind: "scroll"): void {

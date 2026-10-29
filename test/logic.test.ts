@@ -43,6 +43,15 @@ test("parse Chinese reset time and English PM", () => {
   assert.equal(parseLimitReset("no time here", now), null)
 })
 
+test("retry is chosen before scrolling", () => {
+  const cfg = defaultConfig("zh")
+  const result = step(obs({
+    errorYs: [400],
+    buttons: [retry(410), { label: "滚动到底部", y: 500, kind: "scroll" }],
+  }), freshState(0, 3600), cfg)
+  assert.equal(result.action.type, "click")
+})
+
 test("click the retry button nearest the lowest error line", () => {
   const cfg = defaultConfig("zh")
   const state = freshState(0, 3600)
@@ -55,10 +64,19 @@ test("click the retry button nearest the lowest error line", () => {
   assert.equal(result.state.clicks, 1)
 })
 
-test("do not click when several retry buttons have no coordinates match and no single candidate", () => {
+test("do not guess a single coordinate when several retry buttons are far apart", () => {
   const far = pickRetry([retry(10), retry(900)], [400])
   assert.equal(far, null)
   assert.equal(pickRetry([retry(900)], [10])?.y, 900)
+})
+
+test("still presses when several retry buttons belong to different sessions", () => {
+  const cfg = defaultConfig("zh")
+  const result = step(obs({
+    errorYs: [400, -100000],
+    buttons: [retry(10), retry(-100000)],
+  }), freshState(0, 3600), cfg)
+  assert.equal(result.action.type, "click")
 })
 
 test("usage limit pauses and never treats reset as a retry", () => {

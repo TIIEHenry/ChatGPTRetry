@@ -225,15 +225,6 @@ export function step(obs: Observation, prev: State, cfg: Config): StepResult {
   const busy = obs.buttons.some((b) => b.kind === "busy")
   const scroll = obs.buttons.find((b) => b.kind === "scroll")
 
-  if (scroll && obs.now - state.lastScrollAt > 5000 && !obs.userActive) {
-    state.lastScrollAt = obs.now
-    say(
-      "⬇️ View not at bottom; scrolled down and will rescan",
-      "⬇️ 界面未滚到底，已滚动到底并重新读取",
-    )
-    return { action: { type: "scroll" }, state, logs, delayMs: 800 }
-  }
-
   const rowCount = obs.errorYs.length
   if (rowCount !== state.rowCount) {
     const transition = state.rowCount < 0 ? `${rowCount}` : `${state.rowCount}→${rowCount}`
@@ -300,16 +291,35 @@ export function step(obs: Observation, prev: State, cfg: Config): StepResult {
       }
       return { action: { type: "noop" }, state, logs, delayMs: interval }
     }
-    const btn = pickRetry(obs.buttons, obs.errorYs)
-    if (!btn) {
-      return { action: { type: "noop" }, state, logs, delayMs: interval }
+    if (hasRetry) {
+      // 页面会按每个已挂载会话各自的按钮来点。坐标对不上时也不能整轮放弃。
+      const btn = pickRetry(obs.buttons, obs.errorYs)
+      const y = btn?.y ?? obs.buttons.find((b) => b.kind === "retry")!.y
+      state.clicks += 1
+      say(
+        `🖱 Press #${state.clicks} at y=${Math.round(y)}`,
+        `🖱 按压 #${state.clicks}`,
+      )
+      return { action: { type: "click", y }, state, logs, delayMs: interval }
     }
-    state.clicks += 1
+    if (scroll && obs.now - state.lastScrollAt > 5000) {
+      state.lastScrollAt = obs.now
+      say(
+        "⬇️ View not at bottom; scrolled down and will rescan",
+        "⬇️ 界面未滚到底，已滚动到底并重新读取",
+      )
+      return { action: { type: "scroll" }, state, logs, delayMs: 800 }
+    }
+    return { action: { type: "noop" }, state, logs, delayMs: interval }
+  }
+
+  if (scroll && obs.now - state.lastScrollAt > 5000 && !obs.userActive) {
+    state.lastScrollAt = obs.now
     say(
-      `🖱 Press #${state.clicks} at y=${Math.round(btn.y)}`,
-      `🖱 按压 #${state.clicks}`,
+      "⬇️ View not at bottom; scrolled down and will rescan",
+      "⬇️ 界面未滚到底，已滚动到底并重新读取",
     )
-    return { action: { type: "click", y: btn.y }, state, logs, delayMs: interval }
+    return { action: { type: "scroll" }, state, logs, delayMs: 800 }
   }
 
   const sent = idleSend(obs, state, cfg, say)
