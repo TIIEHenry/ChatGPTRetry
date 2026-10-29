@@ -1,0 +1,17 @@
+{
+  "name": "codex-retrypilot-linux",
+  "private": true,
+  "description": "Inject a script into the Linux ChatGPT desktop app and click Retry in the page.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild src/page.ts --bundle --format=iife --global-name=CodexRetryPilot --outfile=page.bundle.js --target=chrome120",
+    "test": "npm run build && node --experimental-strip-types --test test/logic.test.ts test/inject.test.ts",
+    "start": "npm run build && node --experimental-strip-types src/injector.ts"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

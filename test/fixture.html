@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<body>
+  <p id="err">Selected model is at capacity. Please try a different model.</p>
+  <button id="retry" type="button">Retry</button>
+  <button id="reset" type="button">重置使用量</button>
+  <script>
+    window.__clicked = 0
+    window.__reset = 0
+    document.getElementById("retry").addEventListener("click", () => { window.__clicked++ })
+    document.getElementById("reset").addEventListener("click", () => { window.__reset++ })
+  </script>
+</body>
+</html>
