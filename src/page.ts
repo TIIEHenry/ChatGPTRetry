@@ -13,6 +13,7 @@ import {
   freshState,
   noteClickResult,
   noteSend,
+  STALL_KEYWORDS,
   step,
   textHits,
 } from "./logic.ts"
@@ -73,7 +74,8 @@ export function start(partial: Partial<Config> = {}): void {
   p.state = freshState(Date.now(), p.cfg.durationSeconds)
   p.state.running = true
   armInputWatch()
-  log(`▶️ injected | every ${p.cfg.intervalSeconds}s | ${Math.round(p.cfg.durationSeconds / 60)} min`)
+  const span = p.cfg.durationSeconds > 0 ? `${Math.round(p.cfg.durationSeconds / 60)} min` : "until stopped"
+  log(`▶️ injected | every ${p.cfg.intervalSeconds}s | ${span}`)
   queue(400)
 }
 
@@ -116,6 +118,18 @@ function runBody(): void {
     window.setTimeout(() => { if (pilot().running) runBody() }, 700)
     return
   }
+  if (decided.action.type === "resume") {
+    const clicked = pressMountedResumes()
+    if (clicked > 1) log(`↻ 本轮恢复了 ${clicked} 个停滞目标`)
+    window.setTimeout(() => {
+      if (!pilot().running) return
+      const after = collect(pilot().cfg.errorKeywords, pilot().lastInputAt)
+      pilot().state = noteClickResult(pilot().state, clicked > 0, after.stalled, Date.now())
+      if (clicked > 0) log(after.stalled ? "⌛️ 目标仍停滞" : "✅ 停滞目标已恢复")
+      queue(decided.delayMs)
+    }, 1200)
+    return
+  }
   if (decided.action.type === "click") {
     const clicked = pressMountedRetries(p.cfg.errorKeywords)
     if (clicked > 1) log(`🖱 本轮共点了 ${clicked} 个会话的重试`)
@@ -140,7 +154,7 @@ function runBody(): void {
 }
 
 function collect(keywords: string[], lastInputAt: number): Observation {
-  const buttons = collectButtons()
+  const buttons = collectButtons().filter((b) => b.kind !== "resume")
   const errorYs = collectHits(keywords).map((el) => midY(el))
   // 左右滑动会把相邻会话留在 DOM 里，但宽高为 0，按钮也可能是禁用的。
   // 这些「重试」都要计入，否则后台会话永远点不到。
@@ -150,12 +164,17 @@ function collect(keywords: string[], lastInputAt: number): Observation {
     buttons.push({ label: buttonLabel(el), y, kind: "retry" })
     if (!shown(el)) errorYs.push(y)
   }
+  const resumes = mountedResumeButtons()
+  for (const el of resumes) {
+    buttons.push({ label: buttonLabel(el), y: shown(el) ? midY(el) : slotY(el), kind: "resume" })
+  }
   return {
     errorYs,
     limitTexts: collectHits([
       "使用上限", "额度已用完", "usage limit", "codex and work usage", "rate limit resets",
     ]).map((el) => (el.textContent || "").trim()).filter(Boolean),
     buttons,
+    stalled: resumes.length > 0,
     inputValue: readComposer(),
     userActive: Date.now() - lastInputAt < 3000,
     now: Date.now(),
@@ -237,6 +256,15 @@ function pressMountedRetries(keywords: string[]): number {
 }
 
 function mountedRetryButtons(keywords: string[]): HTMLElement[] {
+  return mountedKind(keywords, "retry")
+}
+
+/** 「恢复目标」只在该会话文案含停滞状态时才算，避免目标正常时误点。 */
+function mountedResumeButtons(): HTMLElement[] {
+  return mountedKind(STALL_KEYWORDS, "resume")
+}
+
+function mountedKind(keywords: readonly string[], kind: "retry" | "resume"): HTMLElement[] {
   const roots = conversationRoots()
   const out: HTMLElement[] = []
   for (const root of roots) {
@@ -244,11 +272,23 @@ function mountedRetryButtons(keywords: string[]): HTMLElement[] {
     if (!textHits(text, keywords)) continue
     for (const el of queryDeep("button, [role='button']", root)) {
       if (!(el instanceof HTMLElement) || !painted(el)) continue
-      if (classifyLabel(buttonLabel(el)) !== "retry") continue
+      if (classifyLabel(buttonLabel(el)) !== kind) continue
       out.push(el)
     }
   }
   return out
+}
+
+function pressMountedResumes(): number {
+  const buttons = mountedResumeButtons()
+  let hidden = 0
+  for (const el of buttons) {
+    if (!shown(el)) hidden += 1
+    callOnClick(el)
+    if (!disabled(el)) backgroundClick(el)
+  }
+  if (hidden > 0) log(`↻ 后台会话 ${hidden} 个，恢复目标，不切换窗口`)
+  return buttons.length
 }
 
 interface ReactHook {

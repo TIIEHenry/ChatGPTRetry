@@ -49,14 +49,16 @@ codexretry --restart
 codexretry --duration 8h --interval 10 --port 9333
 ```
 
-`--duration` 接受 `Ns`、`Nm`、`Nh`，省略单位时按分钟计。默认间隔 10 秒，默认时长 30 分钟。
+`--duration` 接受 `Ns`、`Nm`、`Nh`，省略单位时按分钟计。默认间隔 10 秒。不传 `--duration` 时不设截止时间，一直监听到进程退出。
 
 ## 行为
 
 - 只点标题正好是「重试 / Retry / 重試」的按钮。倒计时文案「N 秒后重试」先不点。
+- 会话显示「目标已停滞」时，点该会话的「恢复目标」。不点「清除目标」或「编辑目标」。这时输入框旁即使还有「停止」，也按停滞处理。
 - 不点「重置使用量 / Reset usage / Reset limit」。
 - 出现用量上限、又没有重试按钮时，暂停到解析出的重置时间。
 - 窗口停在别的程序后面时仍然会点。左右滑动留下的相邻会话即使不在画面上，也会点它自己的「重试」，不切换当前会话。完全没挂在页面上的会话点不到。
+- 默认不因时长到期而停止，连续没有错误也不会自动停止。配置里把 `idleStop` 设为 `true` 后，连续 10 分钟没有错误会自动停止。传入 `--duration` 后，到时停止。
 - 窗口最小化较长时间后，Chromium 会放慢页面定时器，检查间隔可能长于设定值。
 - 配置在 `~/.config/CodexRetry/config.json`，也可用 `RETRYPILOT_CONFIG_DIR` 或 `XDG_CONFIG_HOME` 改目录。字段与 macOS 版导出的 JSON 兼容，包括 `intervalSeconds`、`errorKeywords`、`scriptLines`、`limitPause`、`idleSendEnabled`。
 - 日志写到配置目录下的 `logs/`。日志只记脚本自己的状态，不记会话正文。
