@@ -54,6 +54,7 @@ codexretry --duration 8h --interval 10 --port 9333
 ## 行为
 
 - 默认没有运行时长。到了 `--duration` 或配置里的截止时间才停。
+- 没有错误时也继续监控。之后再出现 “at capacity” 仍会点「重试」。
 - 只点标题正好是「重试 / Retry / 重試」的按钮。倒计时文案「N 秒后重试」先不点。
 - 不点「重置使用量 / Reset usage / Reset limit」。
 - 出现用量上限、又没有重试按钮时，暂停到解析出的重置时间。

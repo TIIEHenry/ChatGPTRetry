@@ -27,6 +27,7 @@ export interface Config {
   idleSendEnabled: boolean
   idleSendMinutes: number
   scriptLines: string[]
+  /** 保留以兼容 macOS 配置。不再因为无错误停止监控。 */
   idleStop: boolean
   limitPause: boolean
   sound: boolean
@@ -106,7 +107,7 @@ export function defaultConfig(lang: Lang = "en"): Config {
     scriptLines: lang === "zh"
       ? ["继续执行", "如果有未完成的步骤，继续"]
       : ["Continue", "If any steps are unfinished, continue"],
-    idleStop: true,
+    idleStop: false,
     limitPause: true,
     sound: true,
     noSleep: true,
@@ -331,12 +332,6 @@ export function step(obs: Observation, prev: State, cfg: Config): StepResult {
 
   const sent = idleSend(obs, state, cfg, say)
   if (sent) return { action: sent, state, logs, delayMs: interval }
-  if (cfg.idleStop && !cfg.idleSendEnabled && !busy && obs.now - state.lastErrorAt > 600_000) {
-    state.running = false
-    const reason = t(lang, "no errors for 10 consecutive minutes, auto-stopped", "已连续 10 分钟无错误，自动停止")
-    say(`⏹ ${reason}`, `⏹ ${reason}`)
-    return { action: { type: "stop", reason }, state, logs, delayMs: interval }
-  }
   return { action: { type: "noop" }, state, logs, delayMs: interval }
 }
 

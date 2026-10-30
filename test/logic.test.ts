@@ -141,6 +141,21 @@ test("default run has no deadline", () => {
   assert.equal(later.action.type, "click")
 })
 
+test("a quiet stretch does not stop the monitor", () => {
+  const cfg = defaultConfig("zh")
+  cfg.idleStop = true
+  const start = freshState(0, 0)
+  const quiet = step(obs({ now: 11 * 60_000, mono: 11 * 60_000 }), start, cfg)
+  assert.equal(quiet.action.type, "noop")
+  assert.equal(quiet.state.running, true)
+  const again = step(obs({
+    now: 12 * 60_000,
+    errorYs: [400],
+    buttons: [retry(410)],
+  }), quiet.state, cfg)
+  assert.equal(again.action.type, "click")
+})
+
 test("a finite duration still stops at the deadline", () => {
   const cfg = defaultConfig("zh")
   cfg.durationSeconds = 30 * 60

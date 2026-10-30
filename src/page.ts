@@ -18,7 +18,7 @@ import {
 } from "./logic.ts"
 
 const MARK = "__codexRetryPilot"
-const BUILD = "bg-retry-2"
+const BUILD = "bg-retry-3"
 
 interface Pilot {
   running: boolean
