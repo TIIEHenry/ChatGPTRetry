@@ -69,10 +69,42 @@ codexretry --duration 8h --interval 10 --port 9333
 
 ```bash
 npm install
+npm run build
 npm test
 ```
 
-`npm test` 跑判定单测，并用无头 Chrome 在本机端口 `9337` 上确认脚本会点 Retry、不会点「重置使用量」。它不会连接已经打开的 ChatGPT。
+`npm run build` 用 esbuild 把 `src/page.ts` 打成页面注入用的 `page.bundle.js`。`npm test` 会先重新构建，再跑 `test/logic.test.ts` 的判定单测和 `test/inject.test.ts` 的无头 Chrome 注入测试；测试会使用本机端口 `9337`，不会连接已经打开的 ChatGPT。
+
+本地开发可以直接运行：
+
+```bash
+npm start
+```
+
+它会先构建，再执行 `src/injector.ts`。日常使用和安装后的入口都是 `codexretry`；源码目录中的 `./codexretry` 会在 `page.bundle.js` 缺失或落后于 `src/page.ts`、`src/logic.ts` 时自动构建。需要只验证注入逻辑时，可使用 `codexretry --no-launch --target any --port <端口>` 连接已有的 CDP 页面。
+
+长期维护时保持以下路径和顺序：
+
+1. 页面采集、点击和注入逻辑改在 `src/page.ts`；纯判定、配置解析和状态机改在 `src/logic.ts`；CDP 连接与配置加载改在 `src/injector.ts`；ChatGPT 进程发现、退出和启动改在 `src/launch.ts`。
+2. 先运行 `npm test`，再提交 `src/`、`test/` 和同步生成的 `page.bundle.js`；不要手工编辑生成文件。
+3. 安装发布使用 `PREFIX="$HOME/.local" ./install.sh` 或 `sudo ./install.sh`，脚本会重新构建并把运行所需文件复制到 `$PREFIX/lib/codexretry`，再在 `$PREFIX/bin/codexretry` 建立入口。
+4. 修改配置后优先用隔离目录验证：`RETRYPILOT_CONFIG_DIR=$(mktemp -d) codexretry --no-launch ...`。提交前再次确认 `git status`、`npm test` 和 `git diff`，避免把本地日志或安装产物带进提交。
+
+配置查找顺序是 `RETRYPILOT_CONFIG_DIR`、`XDG_CONFIG_HOME/CodexRetry`、`~/.config/CodexRetry`；文件名固定为 `config.json`，日志写入同目录的 `logs/`。例如：
+
+```json
+{
+  "language": "zh",
+  "intervalSeconds": 10,
+  "durationChoice": "unlimited",
+  "errorKeywords": ["at capacity"],
+  "limitPause": true,
+  "idleSendEnabled": false,
+  "noSleep": true
+}
+```
+
+运行中的进程会监视已经存在的 `config.json`，文件改动会重新载入；首次创建配置文件后重新启动一次即可启用监视。`durationChoice` 也兼容 `15`、`30`、`60`、`120`、`custom` 和 `unlimited`，命令行 `--duration` 还接受 `Ns`、`Nm`、`Nh`。
 
 ## 许可
 
