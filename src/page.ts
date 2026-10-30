@@ -17,7 +17,8 @@ import {
   textHits,
 } from "./logic.ts"
 
-const MARK = "__codexRetryPilot"
+const MARK = "__codexRetryPilot3"
+const LEGACY_MARKS = ["__codexRetryPilot"]
 const BUILD = "bg-retry-3"
 
 interface Pilot {
@@ -28,6 +29,18 @@ interface Pilot {
   timer: number
   lastInputAt: number
   logs: string[]
+}
+
+function retireLegacy(): void {
+  const w = globalThis as unknown as Record<string, Pilot | undefined>
+  for (const key of LEGACY_MARKS) {
+    const old = w[key]
+    if (!old) continue
+    old.running = false
+    old.state.running = false
+    if (old.timer) window.clearTimeout(old.timer)
+    old.timer = 0
+  }
 }
 
 function pilot(): Pilot {
@@ -63,6 +76,7 @@ export function stop(reason = "stopped"): void {
 }
 
 export function start(partial: Partial<Config> = {}): void {
+  retireLegacy()
   const p = pilot()
   apply(partial)
   if (p.running && p.build === BUILD) return
@@ -79,9 +93,9 @@ export function start(partial: Partial<Config> = {}): void {
 }
 
 function armInputWatch(): void {
-  const w = globalThis as unknown as { __codexRetryPilotInput?: boolean }
-  if (w.__codexRetryPilotInput) return
-  w.__codexRetryPilotInput = true
+  const w = globalThis as unknown as { __codexRetryPilotInput3?: boolean }
+  if (w.__codexRetryPilotInput3) return
+  w.__codexRetryPilotInput3 = true
   const mark = () => { pilot().lastInputAt = Date.now() }
   document.addEventListener("keydown", mark, true)
   document.addEventListener("pointerdown", mark, true)
