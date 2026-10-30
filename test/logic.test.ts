@@ -22,6 +22,7 @@ function obs(partial: Partial<Observation> = {}): Observation {
     limitTexts: [],
     buttons: [],
     inputValue: null,
+    stalled: false,
     userActive: false,
     now: 1_000_000,
     mono: 1_000_000,
@@ -125,6 +126,44 @@ test("click cooldown when the error line is still there", () => {
     buttons: [retry(40)],
   }), state, cfg)
   assert.equal(again.action.type, "noop")
+})
+
+test("a stalled goal is resumed even while stop is still showing", () => {
+  const cfg = defaultConfig("zh")
+  const result = step(obs({
+    stalled: true,
+    errorYs: [400],
+    buttons: [
+      { label: "停止", y: 900, kind: "busy" },
+      { label: "滚动到底部", y: 800, kind: "scroll" },
+      { label: "恢复目标", y: 850, kind: "resume" },
+    ],
+  }), freshState(0, 3600), cfg)
+  assert.equal(result.action.type, "resume")
+  assert.match(result.logs.join("\n"), /恢复已停滞的目标/)
+  assert.equal(classifyLabel("恢复目标"), "resume")
+  assert.equal(classifyLabel("Resume goal"), "resume")
+  assert.equal(classifyLabel("清除目标"), "other")
+})
+
+test("resume waits out typing and the click cooldown", () => {
+  const cfg = defaultConfig("zh")
+  const typing = step(obs({
+    stalled: true,
+    userActive: true,
+    errorYs: [40],
+    buttons: [{ label: "恢复目标", y: 1, kind: "resume" }],
+  }), freshState(0, 3600), cfg)
+  assert.equal(typing.action.type, "noop")
+  const cooled = freshState(0, 3600)
+  cooled.cooldownUntil = 30_000
+  const waiting = step(obs({
+    now: 10_000,
+    stalled: true,
+    errorYs: [40],
+    buttons: [{ label: "恢复目标", y: 1, kind: "resume" }],
+  }), cooled, cfg)
+  assert.equal(waiting.action.type, "noop")
 })
 
 test("default run has no deadline", () => {

@@ -4,9 +4,11 @@
  */
 
 export const RETRY_TITLES = ["重试", "Retry", "重試"] as const
+export const RESUME_TITLES = ["恢复目标", "Resume goal"] as const
 export const BUSY_TITLES = ["停止", "Stop", "中止", "Interrupt"] as const
 export const SCROLL_TITLES = ["滚动到底部", "Scroll to bottom", "滾動到底部"] as const
 export const RESET_TITLES = ["重置使用量", "Reset usage", "Reset limit"] as const
+export const STALL_KEYWORDS = ["目标已停滞", "goal stalled"] as const
 export const LIMIT_KEYWORDS = [
   "使用上限",
   "额度已用完",
@@ -34,7 +36,7 @@ export interface Config {
   noSleep: boolean
 }
 
-export type ButtonKind = "retry" | "busy" | "scroll" | "reset" | "other"
+export type ButtonKind = "retry" | "resume" | "busy" | "scroll" | "reset" | "other"
 
 export interface ButtonObs {
   label: string
@@ -46,6 +48,8 @@ export interface Observation {
   errorYs: number[]
   limitTexts: string[]
   buttons: ButtonObs[]
+  /** 有会话显示「目标已停滞」，此时点「恢复目标」而不是「重试」 */
+  stalled: boolean
   /** null = 没有输入框 */
   inputValue: string | null
   userActive: boolean
@@ -80,6 +84,7 @@ export interface State {
 export type Action =
   | { type: "scroll" }
   | { type: "click"; y: number }
+  | { type: "resume" }
   | { type: "idle-send"; line: string }
   | { type: "stop"; reason: string }
   | { type: "noop" }
@@ -147,6 +152,7 @@ export function freshState(now: number, durationSeconds: number): State {
 export function classifyLabel(label: string): ButtonKind {
   const text = label.trim()
   if (RETRY_TITLES.includes(text as (typeof RETRY_TITLES)[number])) return "retry"
+  if (RESUME_TITLES.some((name) => text.toLowerCase() === name.toLowerCase())) return "resume"
   if (BUSY_TITLES.includes(text as (typeof BUSY_TITLES)[number])) return "busy"
   if (SCROLL_TITLES.includes(text as (typeof SCROLL_TITLES)[number])) return "scroll"
   if (RESET_TITLES.some((name) => text.toLowerCase() === name.toLowerCase())) return "reset"
@@ -272,6 +278,19 @@ export function step(obs: Observation, prev: State, cfg: Config): StepResult {
   if (state.limitWas) {
     state.limitWas = false
     say("✅ Usage limit cleared", "✅ 额度上限已解除，恢复正常监控")
+  }
+
+  // 容量错误留在历史里时，界面不再给「重试」，而是把目标标成停滞。
+  // 这时输入框旁仍可能有「停止」，不能把它当成还在正常运行。
+  const resume = obs.buttons.find((b) => b.kind === "resume")
+  if (obs.stalled && resume && !obs.userActive && obs.now >= state.cooldownUntil) {
+    state.clicks += 1
+    state.lastErrorAt = obs.now
+    say(
+      `↻ Resume stalled goal #${state.clicks}`,
+      `↻ 恢复已停滞的目标 #${state.clicks}`,
+    )
+    return { action: { type: "resume" }, state, logs, delayMs: interval }
   }
 
   const residual = rowCount > 0 && !hasRetry && !busy && obs.now - state.rowsStableSince >= 60_000
